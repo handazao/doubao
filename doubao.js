@@ -43,49 +43,21 @@
   }
 
   // ===================== 工具函数 =====================
-  function createCheckboxColumn(checked = false) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "check-box-wrapper-Ed2ep5";
+  function createCheckboxColumn(id, checked = false) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "check-box-wrapper-Ed2ep5";
 
-  const checkboxSpan = document.createElement("span");
-  checkboxSpan.className = `semi-checkbox ${checked ? "semi-checkbox-checked" : ""} semi-checkbox-cardType_unDisabled samantha-checkbox-yTRWcx`;
-  checkboxSpan.setAttribute("data-testid", "ai_space_file_item_checkbox");
+    // 创建复选框
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = id || `checkbox-${Date.now()}`; // 用传入的 id，否则生成一个唯一 id
+    checkbox.checked = checked; // 按参数设置是否选中
 
-  const innerSpan = document.createElement("span");
-  innerSpan.className = `semi-checkbox-inner ${checked ? "semi-checkbox-inner-checked" : ""}`;
+    wrapper.appendChild(checkbox);
 
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.className = "semi-checkbox-input";
-  input.setAttribute("aria-disabled", "false");
-  input.setAttribute("aria-checked", checked ? "true" : "false");
-  input.checked = checked;
+    return wrapper;
+  }
 
-  const displaySpan = document.createElement("span");
-  displaySpan.className = "semi-checkbox-inner-display";
-
-  const iconSpan = document.createElement("span");
-  iconSpan.setAttribute("role", "img");
-  iconSpan.setAttribute("aria-label", "checkbox_tick");
-  iconSpan.className = "semi-icon semi-icon-default semi-icon-checkbox_tick";
-  iconSpan.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-         width="1em" height="1em" focusable="false" aria-hidden="true">
-      <path fill-rule="evenodd" clip-rule="evenodd"
-        d="M17.4111 7.30848C18.0692 7.81171 18.1947 8.75312 17.6915 9.41119L11.1915 17.9112C10.909 18.2806 10.4711 18.4981 10.0061 18.5C9.54105 18.5019 9.10143 18.288 8.81592 17.9209L5.31592 13.4209C4.80731 12.767 4.92512 11.8246 5.57904 11.316C6.23296 10.8074 7.17537 10.9252 7.68398 11.5791L9.98988 14.5438L15.3084 7.58884C15.8116 6.93077 16.7531 6.80525 17.4111 7.30848Z"
-        fill="currentColor"></path>
-    </svg>
-  `;
-
-  // 拼装结构
-  displaySpan.appendChild(iconSpan);
-  innerSpan.appendChild(input);
-  innerSpan.appendChild(displaySpan);
-  checkboxSpan.appendChild(innerSpan);
-  wrapper.appendChild(checkboxSpan);
-
-  return wrapper;
-}
 
   function formatSize(size) {
     if (!size) return "-";
@@ -190,7 +162,7 @@
     });
   }
 
-  function renderFileRows(fileList, isMine) {
+  function renderFileRows(fileList) {
     const missFileList = [];
 
     waitForRows(3, 300)
@@ -212,9 +184,11 @@
           if (row) {
             if (row.dataset.extended) return;
             row.dataset.extended = "true";
-console.log(row)
-            if(window.__isShare__){
-                row.insertBefore(createCheckboxColumn(), row.firstChild);
+
+            if (window.__isShare__) {
+              const checkbox = createCheckboxColumn(item.id);
+              checkbox.querySelector('input[type="checkbox"]').checked = false;
+              row.insertBefore(checkbox, row.firstChild);
             }
             row.appendChild(
               createRightColumn(formatSize(item.size), { minWidth: "10px" })
@@ -282,45 +256,45 @@ console.log(row)
     sortSelect.style.padding = "6px";
 
     const options = [
-        { value: "name_asc", label: "文件名 升序" },
-        { value: "name_desc", label: "文件名 降序" },
-        { value: "time_asc", label: "修改时间 升序" },
-        { value: "time_desc", label: "修改时间 降序" },
+      { value: "name_asc", label: "文件名 升序" },
+      { value: "name_desc", label: "文件名 降序" },
+      { value: "time_asc", label: "修改时间 升序" },
+      { value: "time_desc", label: "修改时间 降序" },
     ];
     options.forEach((opt) => {
-        const option = document.createElement("option");
-        option.value = opt.value;
-        option.textContent = opt.label;
-        sortSelect.appendChild(option);
+      const option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.label;
+      sortSelect.appendChild(option);
     });
 
     sortSelect.addEventListener("change", () => {
-        const keywordInput = document.getElementById("mySearchBox");
-        const keyword = keywordInput ? keywordInput.value.trim().toLowerCase() : "";
-        const sortRule = sortSelect.value;
-        if (window.__allFileData__) {
-            const filtered = filterByKeyword({ children: window.__allFileData__ });
-            const sorted = sortFileList(filtered);
-            renderFileRows(sorted, window.__isMine__);
-        }
+      const keywordInput = document.getElementById("mySearchBox");
+      const keyword = keywordInput ? keywordInput.value.trim().toLowerCase() : "";
+      const sortRule = sortSelect.value;
+      if (window.__allFileData__) {
+        const filtered = filterByKeyword({ children: window.__allFileData__ });
+        const sorted = sortFileList(filtered);
+        renderFileRows(sorted, window.__isMine__);
+      }
     });
 
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "请输入关键词";
     input.style.cssText =
-        "margin:10px 10px 10px 0;padding:6px;border:1px solid #ccc;border-radius:4px;";
+      "margin:10px 10px 10px 0;padding:6px;border:1px solid #ccc;border-radius:4px;";
     input.id = "mySearchBox";
 
     const searchBtn = document.createElement("button");
     searchBtn.innerText = "执行";
     searchBtn.style.cssText = "padding:6px 12px;cursor:pointer;margin-right:10px;";
     searchBtn.onclick = () => {
-        const val = input.value.trim();
-        const allcontainers = document.querySelectorAll(".container-zLcYj3");
-        if (!allcontainers.length) return;
-        const lastContainers = allcontainers[allcontainers.length - 1];
-        lastContainers.click();
+      const val = input.value.trim();
+      const allcontainers = document.querySelectorAll(".container-zLcYj3");
+      if (!allcontainers.length) return;
+      const lastContainers = allcontainers[allcontainers.length - 1];
+      lastContainers.click();
     };
 
     const wrapper = document.createElement("div");
@@ -332,20 +306,8 @@ console.log(row)
     wrapper.appendChild(input);
     wrapper.appendChild(searchBtn);
 
-    // 如果是“分享”，添加保存按钮
-    if (window.__isShare__) {
-        const saveBtn = document.createElement("button");
-        saveBtn.innerText = "保存";
-        saveBtn.style.cssText = "padding:6px 12px;cursor:pointer;";
-        saveBtn.onclick = () => {
-            // 保存逻辑
-            alert("保存操作执行（你可以自定义保存逻辑）");
-        };
-        wrapper.appendChild(saveBtn);
-    }
-
     lastContainer.parentNode.insertBefore(wrapper, lastContainer.nextSibling);
-}
+  }
 
   // 关键词过滤逻辑
   function filterByKeyword(data) {
@@ -410,6 +372,37 @@ console.log(row)
   XMLHttpRequest.prototype.send = function (body) {
     const xhr = this;
 
+    // ---- 分享保存 请求拦截并改参数 ----
+    if (xhr._url && xhr._url.includes("/samantha/aispace/share/dump")) {
+      // 保存逻辑
+      const checkedIds = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(cb => cb.getAttribute("data-id") || cb.id)
+        .filter(id => id); // 过滤掉 null 或空值
+
+      //console.log("选中的ID:", checkedIds);
+      // 没有选中则直接发送原请求
+      if (!checkedIds.length) {
+        return originalSend.call(xhr, body);
+      }
+      // 转换成 node_list 格式
+      const nodeList = checkedIds.map(id => ({ id }));
+
+      try {
+        let requestData = JSON.parse(body || "{}");
+
+        // 修改参数
+        requestData.node_list = nodeList;
+        //console.log("✅ 已修改 dump 请求参数:", requestData);
+        return originalSend.call(xhr, JSON.stringify(requestData));
+      } catch (err) {
+        //console.error("❌ dump 参数修改失败:", err);
+        return originalSend.call(xhr, body);
+      }
+    }
+
+
+    // ---- 分享保存 请求拦截并改参数 ----
+    //xhr._url.includes("/samantha/aispace/share/overvie") ||
     const shouldIntercept =
       xhr._url &&
       (xhr._url.includes("/samantha/aispace/share/node_info") ||
@@ -419,7 +412,7 @@ console.log(row)
 
     try {
 
-      window.__isShare__ = xhr._url.includes("/samantha/aispace/share/node_info");
+      window.__isShare__ = xhr._url.includes("/samantha/aispace/share");
 
       const requestData = JSON.parse(body || "{}");
 
@@ -469,7 +462,7 @@ console.log(row)
           const sorted = sortFileList(filtered);
           fakeResponse.data.children = sorted;
         }
-        renderFileRows(fakeResponse.data.children, true); // isMineFlag 根据请求类型传入
+        renderFileRows(fakeResponse.data.children);
 
         const jsonText = JSON.stringify(fakeResponse);
 
