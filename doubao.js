@@ -43,6 +43,65 @@
   }
 
   // ===================== 工具函数 =====================
+  /**
+   * 根据最新子节点数据 childrenNode，同步更新本地树 currentTreeNode.children
+   * @param {Array} childrenNode 最新接口返回的子节点数组
+   * @param {Object} currentTreeNode 本地树中当前节点
+   */
+  function updateCurrentTreeChildren(childrenNode = [], currentTreeNode) {
+    if (!currentTreeNode) return;
+
+    if (!Array.isArray(childrenNode) || childrenNode.length === 0) {
+      // 最新无子节点，清空本地子节点
+      currentTreeNode.children = [];
+      return;
+    }
+
+    if (!Array.isArray(currentTreeNode.children)) {
+      currentTreeNode.children = [];
+    }
+    let currentTreeSize = currentTreeNode.size || 0;
+
+    // 用 Map 保存旧的本地子节点
+    const localChildrenMap = new Map(
+      currentTreeNode.children.map(child => [child.id, child])
+    );
+
+    const updatedChildren = [];
+
+    childrenNode.forEach(newChild => {
+      const localChild = localChildrenMap.get(newChild.id);
+
+      if (localChild) {
+        // 更新旧节点信息
+        currentTreeSize = currentTreeSize + localChild.size;
+        updatedChildren.push(localChild);
+        localChildrenMap.delete(newChild.id);
+      } else {
+        // 新增节点
+        currentTreeSize = currentTreeSize + newChild.size;
+        updatedChildren.push(newChild);
+      }
+    });
+
+    // localChildrenMap 里剩下的是被删除的节点，这里直接不加入 updatedChildren
+    currentTreeNode.children = updatedChildren;
+    currentTreeNode.size = currentTreeSize;
+  }
+
+  function findNodeById(tree, targetId) {
+    if (tree.id === targetId) {
+      return tree;
+    }
+    if (Array.isArray(tree.children)) {
+      for (const child of tree.children) {
+        const result = findNodeById(child, targetId);
+        if (result) return result;
+      }
+    }
+    return null; // 没找到
+  }
+
   function createCheckboxColumn(id, checked = false) {
     const wrapper = document.createElement("div");
     wrapper.className = "check-box-wrapper-Ed2ep5";
@@ -164,7 +223,7 @@
 
   function renderFileRows(fileList) {
     const missFileList = [];
-
+    const tree = JSON.parse(localStorage.getItem("folderTree"));
     waitForRows(3, 300)
       .then((rows) => {
         // 建立 rowMap: id => DOM 行
@@ -190,9 +249,16 @@
               checkbox.querySelector('input[type="checkbox"]').checked = false;
               row.insertBefore(checkbox, row.firstChild);
             }
-            row.appendChild(
-              createRightColumn(formatSize(item.size), { minWidth: "10px" })
-            );
+            if (item.node_type == 1) {
+              const currentTreeNode = findNodeById(tree, item.id);
+              row.appendChild(
+                createRightColumn(formatSize(currentTreeNode.size), { minWidth: "10px" })
+              );
+            } else {
+              row.appendChild(
+                createRightColumn(formatSize(item.size), { minWidth: "10px" })
+              );
+            }
             row.appendChild(
               createRightColumn(formatDuration(item.content?.duration), {
                 minWidth: "10px",
@@ -405,6 +471,7 @@
     //xhr._url.includes("/samantha/aispace/share/overvie") ||
     const shouldIntercept =
       xhr._url &&
+      (xhr._url.includes("/samantha/aispace/homepage")) ||
       (xhr._url.includes("/samantha/aispace/share/node_info") ||
         xhr._url.includes("/samantha/aispace/node_info"));
 
@@ -413,11 +480,16 @@
     try {
 
       window.__isShare__ = xhr._url.includes("/samantha/aispace/share");
+      const isRoot = xhr._url.includes("/samantha/aispace/homepage");
 
       const requestData = JSON.parse(body || "{}");
 
       const allChildren = [];
+      const childrenNode = [];
+      let nodeSize = 0;
       let nextCursor = null;
+      let systemDirectory = [];
+      let currentId = requestData.node_id;
 
       async function fetchAllPages() {
         let hasMore = true;
@@ -434,26 +506,72 @@
           const res = await sendGMRequest(reqPayload);
           const json = JSON.parse(res.responseText);
 
+          systemDirectory = json?.data?.system_directory || [];
           const children = json?.data?.children || [];
           const cursor = json?.data?.next_cursor;
           const more = json?.data?.has_more;
+          const size = children.reduce((sum, c) => sum + (c.size || 0), 0);
+          nodeSize = nodeSize + size;
+
+          children.forEach(child => {
+            if (child.node_type === 1) { // 只要文件夹
+              childrenNode.push(child);
+            }
+          });
 
           allChildren.push(...children);
           //console.log(`📦 拉取了 ${allChildren.length} 条, next_cursor=${cursor}, has_more=${more}`);
+
+          if (!window.__isShare__ && !more) {
+            const nodeInfo = json?.data?.node_info || {};
+            currentId = isRoot ? json?.data?.root_id : currentId; // 修正字段
+
+            // 从缓存读取树
+            let tree = JSON.parse(localStorage.getItem("folderTree"));
+            if (isRoot && !tree) {
+              tree = {
+                id: currentId,
+                root_id: currentId,
+                name: "我的云盘",
+                node_type: 1,
+                size: 0,
+                children: [],
+              }
+            }
+
+            let currentTreeNode = findNodeById(tree, currentId);
+
+            if (currentTreeNode) {
+              currentTreeNode.size = nodeSize;
+              updateCurrentTreeChildren(childrenNode, currentTreeNode);
+            } else {
+              // 找到父节点
+              const parentId = nodeInfo.parent_id;
+              let parentNode = findNodeById(tree, parentId);
+              if (parentNode) {
+                parentNode.children.push(childrenNode);
+              }
+            }
+
+            // 回存到 localStorage
+            localStorage.setItem("folderTree", JSON.stringify(tree));
+          }
 
           hasMore = more === true;
           nextCursor = cursor;
         }
 
         // ✅ 构造完整响应结构
-        const fakeResponse = {
+        let fakeResponse = {
           code: 0,
           msg: "",
           data: {
             node_info: {},
             children: allChildren,
-            next_cursor: null,
+            next_cursor: -1,
             has_more: false,
+            root_id: currentId || -1,
+            system_directory: systemDirectory || []
           },
         };
 
@@ -500,7 +618,7 @@
 
       return; // 阻止原始 XHR 请求
     } catch (e) {
-      //console.warn("[XHR 拦截失败]", e);
+      console.warn("[XHR 拦截失败]", e);
     }
 
     return originalSend.call(xhr, body); // fallback
