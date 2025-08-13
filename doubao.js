@@ -249,10 +249,11 @@
               checkbox.querySelector('input[type="checkbox"]').checked = false;
               row.insertBefore(checkbox, row.firstChild);
             }
-            if (item.node_type == 1) {
+            if (item.node_type == 1 && tree) {
               const currentTreeNode = findNodeById(tree, item.id);
+              const sizeValue = currentTreeNode?.size ?? 0; // 没找到就用 0
               row.appendChild(
-                createRightColumn(formatSize(currentTreeNode.size), { minWidth: "10px" })
+                createRightColumn(formatSize(sizeValue), { minWidth: "10px" })
               );
             } else {
               row.appendChild(
@@ -424,6 +425,23 @@
     return data;
   }
 
+  // 用 fetch 代替原 XHR
+  function sendDumpRequest(url, payload) {
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      credentials: "include"
+    }).then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.json();
+    });
+  }
+
   // XHR 拦截
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
@@ -441,29 +459,62 @@
     // ---- 分享保存 请求拦截并改参数 ----
     if (xhr._url && xhr._url.includes("/samantha/aispace/share/dump")) {
       // 保存逻辑
-      const checkedIds = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+      let checkedIds = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
         .map(cb => cb.getAttribute("data-id") || cb.id)
         .filter(id => id); // 过滤掉 null 或空值
 
-      //console.log("选中的ID:", checkedIds);
-      // 没有选中则直接发送原请求
-      if (!checkedIds.length) {
-        return originalSend.call(xhr, body);
+      // 如果没勾选任何，则选择所有 checkbox
+      if (checkedIds.length === 0) {
+        checkedIds = Array.from(document.querySelectorAll('input[type="checkbox"]'))
+          .map(cb => cb.getAttribute("data-id") || cb.id)
+          .filter(Boolean);
+        if (checkedIds.length < 50) {
+          return originalSend.call(xhr, body);
+        }
       }
+
       // 转换成 node_list 格式
-      const nodeList = checkedIds.map(id => ({ id }));
-
-      try {
-        let requestData = JSON.parse(body || "{}");
-
-        // 修改参数
-        requestData.node_list = nodeList;
-        //console.log("✅ 已修改 dump 请求参数:", requestData);
-        return originalSend.call(xhr, JSON.stringify(requestData));
-      } catch (err) {
-        //console.error("❌ dump 参数修改失败:", err);
-        return originalSend.call(xhr, body);
+      if (checkedIds.length <= 50) {
+        const nodeList = checkedIds.map(id => ({ id }));
+        try {
+          let requestData = JSON.parse(body || "{}");
+          // 修改参数
+          requestData.node_list = nodeList;
+          //console.log("✅ 已修改 dump 请求参数:", requestData);
+          return originalSend.call(xhr, JSON.stringify(requestData));
+        } catch (err) {
+          //console.error("❌ dump 参数修改失败:", err);
+          return originalSend.call(xhr, body);
+        }
       }
+
+      // 按 50 个一组切分数组
+      const chunkSize = 50;
+      const chunks = [];
+      for (let i = 0; i < checkedIds.length; i += chunkSize) {
+        chunks.push(checkedIds.slice(i, i + chunkSize));
+      }
+
+      // 顺序发送请求
+      (async function sendChunks() {
+        for (let i = 0; i < chunks.length; i++) {
+          const nodeList = chunks[i].map(id => ({ id }));
+
+          try {
+            let requestData = JSON.parse(body || "{}");
+            requestData.node_list = nodeList;
+
+            const response = await sendDumpRequest(xhr._url, requestData);
+            //console.log(`✅ 保存第 ${i + 1}/${chunks.length} 批成功`);
+          } catch (err) {
+            //console.error(`❌ 保存第 ${i + 1} 批失败`, err);
+          }
+        }
+      })();
+      // 调用原始 xhr 继续发送
+      let requestData = JSON.parse(body || "{}");
+      requestData.node_list = [{}];
+      return originalSend.call(xhr, JSON.stringify(requestData));
     }
 
 
@@ -618,7 +669,7 @@
 
       return; // 阻止原始 XHR 请求
     } catch (e) {
-      console.warn("[XHR 拦截失败]", e);
+      //console.warn("[XHR 拦截失败]", e);
     }
 
     return originalSend.call(xhr, body); // fallback
