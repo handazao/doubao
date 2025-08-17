@@ -64,12 +64,12 @@
 
     // 用 Map 保存旧的本地子节点
     const localChildrenMap = new Map(
-      currentTreeNode.children.map(child => [child.id, child])
+      currentTreeNode.children.map((child) => [child.id, child])
     );
 
     const updatedChildren = [];
 
-    childrenNode.forEach(newChild => {
+    childrenNode.forEach((newChild) => {
       const localChild = localChildrenMap.get(newChild.id);
 
       if (localChild) {
@@ -107,8 +107,8 @@
     wrapper.className = "check-box-wrapper-Ed2ep5";
 
     // 创建复选框
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
     checkbox.id = id || `checkbox-${Date.now()}`; // 用传入的 id，否则生成一个唯一 id
     checkbox.checked = checked; // 按参数设置是否选中
 
@@ -116,7 +116,6 @@
 
     return wrapper;
   }
-
 
   function formatSize(size) {
     if (!size) return "-";
@@ -266,7 +265,7 @@
               })
             );
             row.appendChild(
-              createRightColumn(getAiStatus(item.content?.ai_skill_status), {
+              createRightColumn(item.content?.duration ? "可播放" : "--", {
                 minWidth: "10px",
               })
             );
@@ -308,7 +307,6 @@
     });
   }
 
-
   function insertSearchBox() {
     const containers = document.querySelectorAll(".container-upw8nU");
     if (!containers.length) return;
@@ -337,7 +335,9 @@
 
     sortSelect.addEventListener("change", () => {
       const keywordInput = document.getElementById("mySearchBox");
-      const keyword = keywordInput ? keywordInput.value.trim().toLowerCase() : "";
+      const keyword = keywordInput
+        ? keywordInput.value.trim().toLowerCase()
+        : "";
       const sortRule = sortSelect.value;
       if (window.__allFileData__) {
         const filtered = filterByKeyword({ children: window.__allFileData__ });
@@ -355,7 +355,8 @@
 
     const searchBtn = document.createElement("button");
     searchBtn.innerText = "执行";
-    searchBtn.style.cssText = "padding:6px 12px;cursor:pointer;margin-right:10px;";
+    searchBtn.style.cssText =
+      "padding:6px 12px;cursor:pointer;margin-right:10px;";
     searchBtn.onclick = () => {
       const val = input.value.trim();
       const allcontainers = document.querySelectorAll(".container-zLcYj3");
@@ -430,11 +431,11 @@
     return fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
-      credentials: "include"
-    }).then(res => {
+      credentials: "include",
+    }).then((res) => {
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
@@ -459,14 +460,18 @@
     // ---- 分享保存 请求拦截并改参数 ----
     if (xhr._url && xhr._url.includes("/samantha/aispace/share/dump")) {
       // 保存逻辑
-      let checkedIds = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
-        .map(cb => cb.getAttribute("data-id") || cb.id)
-        .filter(id => id); // 过滤掉 null 或空值
+      let checkedIds = Array.from(
+        document.querySelectorAll('input[type="checkbox"]:checked')
+      )
+        .map((cb) => cb.getAttribute("data-id") || cb.id)
+        .filter((id) => id); // 过滤掉 null 或空值
 
       // 如果没勾选任何，则选择所有 checkbox
       if (checkedIds.length === 0) {
-        checkedIds = Array.from(document.querySelectorAll('input[type="checkbox"]'))
-          .map(cb => cb.getAttribute("data-id") || cb.id)
+        checkedIds = Array.from(
+          document.querySelectorAll('input[type="checkbox"]')
+        )
+          .map((cb) => cb.getAttribute("data-id") || cb.id)
           .filter(Boolean);
         if (checkedIds.length < 50) {
           return originalSend.call(xhr, body);
@@ -475,7 +480,7 @@
 
       // 转换成 node_list 格式
       if (checkedIds.length <= 50) {
-        const nodeList = checkedIds.map(id => ({ id }));
+        const nodeList = checkedIds.map((id) => ({ id }));
         try {
           let requestData = JSON.parse(body || "{}");
           // 修改参数
@@ -498,7 +503,7 @@
       // 顺序发送请求
       (async function sendChunks() {
         for (let i = 0; i < chunks.length; i++) {
-          const nodeList = chunks[i].map(id => ({ id }));
+          const nodeList = chunks[i].map((id) => ({ id }));
 
           try {
             let requestData = JSON.parse(body || "{}");
@@ -517,19 +522,16 @@
       return originalSend.call(xhr, JSON.stringify(requestData));
     }
 
-
     // ---- 分享保存 请求拦截并改参数 ----
     //xhr._url.includes("/samantha/aispace/share/overvie") ||
     const shouldIntercept =
-      xhr._url &&
-      (xhr._url.includes("/samantha/aispace/homepage")) ||
-      (xhr._url.includes("/samantha/aispace/share/node_info") ||
-        xhr._url.includes("/samantha/aispace/node_info"));
+      (xhr._url && xhr._url.includes("/samantha/aispace/homepage")) ||
+      xhr._url.includes("/samantha/aispace/share/node_info") ||
+      xhr._url.includes("/samantha/aispace/node_info");
 
     if (!shouldIntercept) return originalSend.call(xhr, body);
 
     try {
-
       window.__isShare__ = xhr._url.includes("/samantha/aispace/share");
       const isRoot = xhr._url.includes("/samantha/aispace/homepage");
 
@@ -564,8 +566,9 @@
           const size = children.reduce((sum, c) => sum + (c.size || 0), 0);
           nodeSize = nodeSize + size;
 
-          children.forEach(child => {
-            if (child.node_type === 1) { // 只要文件夹
+          children.forEach((child) => {
+            if (child.node_type === 1) {
+              // 只要文件夹
               childrenNode.push(child);
             }
           });
@@ -587,7 +590,7 @@
                 node_type: 1,
                 size: 0,
                 children: [],
-              }
+              };
             }
 
             let currentTreeNode = findNodeById(tree, currentId);
@@ -622,7 +625,7 @@
             next_cursor: -1,
             has_more: false,
             root_id: currentId || -1,
-            system_directory: systemDirectory || []
+            system_directory: systemDirectory || [],
           },
         };
 
